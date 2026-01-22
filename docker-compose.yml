@@ -1,0 +1,79 @@
+version: '3.9'
+
+services:
+  # Laravel Backend
+  laravel:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smarthr360-laravel
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    networks:
+      - smarthr-net
+    depends_on:
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=smarthr360
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=secret
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: smarthr360-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: smarthr360
+      MYSQL_ROOT_PASSWORD: rootsecret
+      MYSQL_PASSWORD: secret
+      MYSQL_USER: laravel
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - smarthr-net
+    ports:
+      - "3307:3306"
+
+  # Nginx Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: smarthr360-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - laravel
+    networks:
+      - smarthr-net
+
+  # React Frontend (Vite)
+  vite:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smarthr360-vite
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      - smarthr-net
+
+networks:
+  smarthr-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
